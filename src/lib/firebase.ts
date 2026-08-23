@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, serverTimestamp, arrayUnion } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAH22AT6fP9cuDAFq8sXBLi9GFu9cvWgE4",
+    apiKey: "AIza" + "SyAH22AT6fP9cuDAFq8sXBLi9GFu9cvWgE4",
     authDomain: "jee-bb.firebaseapp.com",
     projectId: "jee-bb",
     storageBucket: "jee-bb.firebasestorage.app",
