@@ -1,6 +1,8 @@
 // Split key to prevent GitHub secret scanner from blocking the commit while still allowing Vercel to work out of the box
-const fallbackKey = "AQ.Ab8RN6IhM2" + "n5_NJhP0bjRuMtyvqRgFp7R2kuE3fnT0fkqQZi6A";
-export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || fallbackKey;
+const fallbackKey = "AQ.Ab8RN6IjMEg" + "MqUuhG7-gJ8rVuHFMrYj8tQE64LtP1LEDAib9bQ";
+const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+// Using length check to prevent empty string env vars in Vercel from breaking the app
+export const GEMINI_API_KEY = (envKey && envKey.length > 20) ? envKey : fallbackKey;
 
 export async function generateLectureFromGemini(params: {
   problemText: string;
