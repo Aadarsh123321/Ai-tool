@@ -75,11 +75,8 @@ app.post('/api/tts', async (req, res) => {
       return res.status(400).json({ error: 'Text is required' });
     }
     
-    // Microsoft Edge Free TTS only supports Swara and Madhur for Hindi. 
-    // Aarti is an Azure-only voice that causes a 15-second timeout on the free tier.
-    // We map it to Swara to ensure fast, working Hinglish female speech!
-    const selectedVoice = voice || 'hi-IN-AartiNeural';
-    const safeVoice = selectedVoice === 'hi-IN-AartiNeural' ? 'hi-IN-SwaraNeural' : selectedVoice;
+    // Hardcoded to SwaraNeural as requested permanently
+    const safeVoice = 'hi-IN-SwaraNeural';
     
     const tts = new EdgeTTS({ voice: safeVoice });
     const tempFilePath = path.join(os.tmpdir(), `tts-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.mp3`);

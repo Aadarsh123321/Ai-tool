@@ -66,13 +66,7 @@ export interface Lecture {
   createdAt: number;
 }
 
-export type VoiceModelId = 
-  | 'hi-IN-MadhurNeural'
-  | 'hi-IN-SwaraNeural'
-  | 'hi-IN-AartiNeural'
-  | 'en-IN-PrabhatNeural'
-  | 'en-IN-NeerjaExpressiveNeural'
-  | 'gemini_kore';
+export type VoiceModelId = 'hi-IN-SwaraNeural';
 
 export interface VoiceSettings {
   voiceModel: VoiceModelId;
