@@ -20,6 +20,12 @@ interface LectureControlsProps {
 
 const VOICE_OPTIONS: { id: VoiceModelId; name: string; tag: string; description: string }[] = [
   {
+    id: 'hi-IN-AartiNeural',
+    name: 'Aarti Ma\'am',
+    tag: 'Perfect Hinglish',
+    description: 'Natural female voice perfect for Hinglish & Hindi',
+  },
+  {
     id: 'hi-IN-MadhurNeural',
     name: 'Madhur Sir',
     tag: 'Kota Mentor',
