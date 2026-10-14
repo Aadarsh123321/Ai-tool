@@ -26,14 +26,24 @@ export class AudioEngine {
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return;
 
-    // Best available browser neural voice for extreme fallback
-    const indianVoice = voices.find(v => 
-      (v.lang === 'hi-IN' || v.lang === 'en-IN') && 
-      (v.name.includes('Natural') || v.name.includes('Neural') || v.name.includes('Google') || v.name.includes('Neerja'))
-    ) || voices.find(v => v.lang === 'hi-IN' || v.lang === 'en-IN') 
-      || voices.find(v => v.name.includes('Natural') || v.name.includes('Neural'))
-      || voices.find(v => v.lang.startsWith('en')) 
-      || voices[0];
+    // Best available browser neural voice for extreme fallback (Forcing Female)
+    const isFemale = (name) => {
+      const lower = name.toLowerCase();
+      // Exclude known male names
+      if (lower.includes('male') && !lower.includes('female')) return false;
+      if (lower.includes('david') || lower.includes('ravi') || lower.includes('madhur') || lower.includes('prabhat')) return false;
+      // Include known female indicators
+      return lower.includes('female') || lower.includes('swara') || lower.includes('aarti') || 
+             lower.includes('neerja') || lower.includes('aditi') || lower.includes('zira') || 
+             lower.includes('samantha') || lower.includes('google');
+    };
+
+    const indianFemale = voices.find(v => (v.lang === 'hi-IN' || v.lang === 'en-IN') && isFemale(v.name))
+                      || voices.find(v => (v.lang === 'hi-IN' || v.lang === 'en-IN'))
+                      || voices.find(v => v.lang.startsWith('en') && isFemale(v.name))
+                      || voices[0];
+                      
+    const indianVoice = indianFemale;
 
     this.naturalVoice = indianVoice || null;
   }
@@ -88,7 +98,7 @@ export class AudioEngine {
   }
 
   // Pre-fetch upcoming lecture steps in the background for zero-latency instant human speech
-  public async prefetchSpeech(text: string, voice: string = 'hi-IN-MadhurNeural'): Promise<void> {
+  public async prefetchSpeech(text: string, voice: string = 'hi-IN-SwaraNeural'): Promise<void> {
     if (!text || text.trim().length === 0) return;
     const cacheKey = `${voice}_${text.trim()}`;
     if (this.audioCache.has(cacheKey) || this.pendingFetches.has(cacheKey)) return;
@@ -171,7 +181,7 @@ export class AudioEngine {
 
     const rate = options.rate || 1.0;
     const pitch = options.pitch || 1.0;
-    const voice = options.voiceName || 'hi-IN-MadhurNeural';
+    const voice = options.voiceName || 'hi-IN-SwaraNeural';
     const cacheKey = `${voice}_${text.trim()}`;
 
     let audioBuffer = this.audioCache.get(cacheKey);
@@ -244,7 +254,7 @@ export class AudioEngine {
 
     const rate = options.rate || 1.0;
     const pitch = options.pitch || 1.0;
-    const voice = options.voiceName || 'hi-IN-MadhurNeural';
+    const voice = options.voiceName || 'hi-IN-SwaraNeural';
     const cacheKey = `${voice}_${text.trim()}`;
 
     // 1. Check if audio is already cached in memory
@@ -386,7 +396,7 @@ export class AudioEngine {
       }
 
       utterance.rate = Math.max(0.85, Math.min(1.15, rate));
-      utterance.pitch = Math.max(0.9, Math.min(1.1, pitch));
+      utterance.pitch = 1.18;
       utterance.volume = 1.0;
 
       const estimatedDurationMs = Math.max(1200, (text.length * 72) / utterance.rate);

@@ -487,10 +487,71 @@ export default function App() {
         }
     };
 
+    const speakWithFemaleWebSpeech = (text: string): Promise<void> => {
+        return new Promise((resolve) => {
+            if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+                resolve();
+                return;
+            }
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices() || [];
+                
+                const isFemale = (v: SpeechSynthesisVoice) => {
+                    const name = (v.name || '').toLowerCase();
+                    if (name.includes('male') && !name.includes('female')) return false;
+                    if (name.includes('david') || name.includes('ravi') || name.includes('madhur') || name.includes('prabhat') || name.includes('mark') || name.includes('george')) return false;
+                    return name.includes('female') || name.includes('swara') || name.includes('aarti') || 
+                           name.includes('neerja') || name.includes('aditi') || name.includes('heera') || 
+                           name.includes('kalpana') || name.includes('zira') || name.includes('samantha') || 
+                           name.includes('karen') || name.includes('victoria') || name.includes('google') ||
+                           name.includes('natural');
+                };
+
+                const voice = voices.find(v => (v.lang === 'hi-IN' || v.lang.startsWith('hi')) && isFemale(v))
+                    || voices.find(v => (v.lang === 'en-IN') && isFemale(v))
+                    || voices.find(v => (v.lang === 'hi-IN' || v.lang.startsWith('hi')) && !v.name.toLowerCase().includes('ravi') && !v.name.toLowerCase().includes('david'))
+                    || voices.find(v => isFemale(v))
+                    || voices.find(v => v.lang.startsWith('en') && isFemale(v))
+                    || voices[0];
+                    
+                if (voice) {
+                    utterance.voice = voice;
+                }
+                
+                // Feminine, clear, expressive mentor pitch
+                utterance.pitch = 1.18;
+                utterance.rate = 0.95;
+                utterance.volume = 1.0;
+
+                const safetyTimeout = setTimeout(() => {
+                    resolve();
+                }, Math.max(3000, text.length * 90));
+
+                utterance.onend = () => {
+                    clearTimeout(safetyTimeout);
+                    resolve();
+                };
+                utterance.onerror = () => {
+                    clearTimeout(safetyTimeout);
+                    resolve();
+                };
+
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.warn('Web Speech error:', e);
+                resolve();
+            }
+        });
+    };
+
     const playStep = async (step: any) => {
         const speech = step.speech || "";
         setSubtitles("");
         
+        let audioSuccess = false;
+
         try {
             const response = await fetch('/api/tts', {
                 method: 'POST',
@@ -500,75 +561,107 @@ export default function App() {
             
             if (abortStepRef.current) return;
             
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            
-            const audioUrl = "data:audio/mp3;base64," + data.audio;
-            const audio = new Audio(audioUrl);
-            currentAudioRef.current = audio;
-            audio.playbackRate = 1.0;
-            
-            await new Promise(resolve => {
-                audio.addEventListener('loadedmetadata', resolve);
-                audio.addEventListener('error', resolve);
-            });
-            if (abortStepRef.current) return;
-            const estimatedDurationMs = (audio.duration && isFinite(audio.duration)) ? (audio.duration * 1000) / audio.playbackRate : speech.length * 75;
-            const phrases = speech.match(/[^.?!,]+[.?!,]?/g) || [speech];
-            
-            audio.addEventListener('timeupdate', () => {
-                if (audio.duration && !abortStepRef.current) {
-                    const progress = audio.currentTime / audio.duration;
-                    const idx = Math.floor(progress * phrases.length);
-                    setSubtitles(phrases[Math.min(idx, phrases.length - 1)].trim());
-                }
-            });
-            const visualsPromise = step.visuals ? executeVisuals(step.visuals, estimatedDurationMs) : Promise.resolve();
-            if (!isPausedRef.current) {
-                audio.play().catch(e => console.error("Audio playback error:", e));
-            }
-            await new Promise((resolve) => {
-                const checkAbort = setInterval(() => {
-                    if (abortStepRef.current) {
-                        audio.pause();
-                        clearInterval(checkAbort);
-                        resolve(null);
+            if (response.ok) {
+                const data = await response.json();
+                const base64Audio = data.audio || data.audioBase64;
+                if (!data.error && base64Audio) {
+                    const audioUrl = "data:audio/mp3;base64," + base64Audio;
+                    const audio = new Audio(audioUrl);
+                    currentAudioRef.current = audio;
+                    audio.playbackRate = 1.0;
+                    
+                    await new Promise(resolve => {
+                        audio.addEventListener('loadedmetadata', resolve, { once: true });
+                        audio.addEventListener('error', resolve, { once: true });
+                        setTimeout(resolve, 800);
+                    });
+                    
+                    if (abortStepRef.current) return;
+                    
+                    const estimatedDurationMs = (audio.duration && isFinite(audio.duration) && audio.duration > 0.5) 
+                        ? (audio.duration * 1000) / audio.playbackRate 
+                        : Math.max(1500, speech.length * 75);
+                    const phrases = speech.match(/[^.?!,]+[.?!,]?/g) || [speech];
+                    
+                    audio.addEventListener('timeupdate', () => {
+                        if (audio.duration && !abortStepRef.current) {
+                            const progress = audio.currentTime / audio.duration;
+                            const idx = Math.floor(progress * phrases.length);
+                            setSubtitles(phrases[Math.min(idx, phrases.length - 1)].trim());
+                        }
+                    });
+                    
+                    const visualsPromise = step.visuals ? executeVisuals(step.visuals, estimatedDurationMs) : Promise.resolve();
+                    
+                    if (!isPausedRef.current) {
+                        try {
+                            await audio.play();
+                            audioSuccess = true;
+                        } catch (playErr) {
+                            console.warn("Direct audio.play blocked or failed, will fall back to Web Speech:", playErr);
+                        }
+                    } else {
+                        audioSuccess = true;
                     }
-                }, 50);
-                
-                audio.onended = () => {
-                    clearInterval(checkAbort);
-                    resolve(null);
-                };
-                audio.onerror = () => {
-                    clearInterval(checkAbort);
-                    resolve(null);
-                };
-            });
-            await visualsPromise.catch(() => {});
-            await stoppableSleep(800);
-        } catch (err) {
-            console.error("TTS Failed, falling back to delay", err);
-            const fallbackDurationMs = speech.length * 75;
-            
-            let phraseIdx = 0;
-            const phrases = speech.match(/[^.?!,]+[.?!,]?/g) || [speech];
-            const phraseInt = setInterval(() => {
-                if (abortStepRef.current || phraseIdx >= phrases.length) {
-                    clearInterval(phraseInt);
-                    return;
+                    
+                    if (audioSuccess) {
+                        await new Promise((resolve) => {
+                            const checkAbort = setInterval(() => {
+                                if (abortStepRef.current) {
+                                    audio.pause();
+                                    clearInterval(checkAbort);
+                                    resolve(null);
+                                }
+                            }, 50);
+                            
+                            audio.onended = () => {
+                                clearInterval(checkAbort);
+                                resolve(null);
+                            };
+                            audio.onerror = () => {
+                                clearInterval(checkAbort);
+                                resolve(null);
+                            };
+                        });
+                        
+                        await visualsPromise.catch(() => {});
+                        await stoppableSleep(800);
+                        return;
+                    }
                 }
-                if (!isPausedRef.current) {
-                    setSubtitles(phrases[phraseIdx].trim());
-                    phraseIdx++;
-                }
-            }, (fallbackDurationMs) / phrases.length);
-            if (step.visuals) {
-                await executeVisuals(step.visuals, fallbackDurationMs);
             }
-            await stoppableSleep(fallbackDurationMs + 800);
-            clearInterval(phraseInt);
+        } catch (fetchErr) {
+            console.warn("Server TTS call failed, falling back to guaranteed female Web Speech:", fetchErr);
         }
+
+        if (abortStepRef.current) return;
+
+        // Guaranteed Female Web Speech Fallback - NEVER silent!
+        const fallbackDurationMs = Math.max(1500, speech.length * 75);
+        let phraseIdx = 0;
+        const phrases = speech.match(/[^.?!,]+[.?!,]?/g) || [speech];
+        const phraseInt = setInterval(() => {
+            if (abortStepRef.current || phraseIdx >= phrases.length) {
+                clearInterval(phraseInt);
+                return;
+            }
+            if (!isPausedRef.current) {
+                setSubtitles(phrases[phraseIdx].trim());
+                phraseIdx++;
+            }
+        }, (fallbackDurationMs) / phrases.length);
+        
+        const visualsPromise = step.visuals ? executeVisuals(step.visuals, fallbackDurationMs) : Promise.resolve();
+        
+        if (!isPausedRef.current) {
+            await speakWithFemaleWebSpeech(speech);
+        } else {
+            await stoppableSleep(fallbackDurationMs);
+        }
+        
+        await visualsPromise.catch(() => {});
+        await stoppableSleep(800);
+        clearInterval(phraseInt);
     };
 
     const startPlaybackLoop = async () => {
@@ -610,6 +703,9 @@ export default function App() {
              if (currentAudioRef.current) {
                  currentAudioRef.current.pause();
              }
+             if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                 window.speechSynthesis.cancel();
+             }
              
              clearBoard();
              for (let i = 0; i < index; i++) {
@@ -631,7 +727,11 @@ export default function App() {
         setIsPaused(paused);
         if (currentAudioRef.current) {
             if (paused) currentAudioRef.current.pause();
-            else currentAudioRef.current.play();
+            else currentAudioRef.current.play().catch(() => {});
+        }
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            if (paused) window.speechSynthesis.pause();
+            else window.speechSynthesis.resume();
         }
     };
 
